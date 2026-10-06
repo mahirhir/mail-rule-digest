@@ -59,14 +59,15 @@ def _auth_secret() -> tuple[str, str]:
     return "password", _env("IMAP_PASSWORD")
 
 
-def fetch_imap(days: int, limit: int) -> list[Message]:
-    """Fetch messages from the last `days` days without changing any flags."""
+def fetch_imap(days: int, limit: int, since_date: date | None = None) -> list[Message]:
+    """Fetch messages from the last `days` days (or on/after `since_date`) without changing any flags."""
     host = _env("IMAP_HOST")
     user = _env("IMAP_USER")
     method, secret = _auth_secret()
     port = int(_env("IMAP_PORT", "993"))
     folder = _env("IMAP_FOLDER", "INBOX")
-    since = (date.today() - timedelta(days=max(days - 1, 0))).strftime("%d-%b-%Y")
+    start = since_date or (date.today() - timedelta(days=max(days - 1, 0)))
+    since = start.strftime("%d-%b-%Y")
 
     try:
         # imaplib's own default context skips certificate checks, so pass a verifying one.
