@@ -5,7 +5,9 @@ from __future__ import annotations
 import contextlib
 import imaplib
 import os
+import shlex
 import ssl
+import subprocess
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -23,11 +25,45 @@ def _env(name: str, default: str | None = None) -> str:
     return value
 
 
+def xoauth2_string(user: str, token: str) -> bytes:
+    """SASL XOAUTH2 initial response: user=<u>^Aauth=Bearer <token>^A^A (imaplib base64-encodes it)."""
+    return f"user={user}auth=Bearer {token}".encode()
+
+
+def _token_from_command(command: str) -> str:
+    """Run the user's token command (no shell); its stdout is the access token."""
+    try:
+        argv = shlex.split(command)
+        proc = subprocess.run(argv, capture_output=True, text=True, timeout=30, check=False)
+    except subprocess.TimeoutExpired:
+        raise SourceError("IMAP_TOKEN_COMMAND timed out after 30s") from None
+    except (OSError, ValueError) as exc:
+        raise SourceError(f"IMAP_TOKEN_COMMAND could not run: {type(exc).__name__}") from None
+    # Neither stdout nor stderr is echoed: either may contain the token.
+    if proc.returncode != 0:
+        raise SourceError(f"IMAP_TOKEN_COMMAND exited with status {proc.returncode}")
+    token = proc.stdout.strip()
+    if not token:
+        raise SourceError("IMAP_TOKEN_COMMAND printed no token")
+    return token
+
+
+def _auth_secret() -> tuple[str, str]:
+    """Pick the auth method: ('xoauth2', token) if a token is configured, else ('password', pw)."""
+    token = os.environ.get("IMAP_ACCESS_TOKEN")
+    if token and token.strip():
+        return "xoauth2", token.strip()
+    command = os.environ.get("IMAP_TOKEN_COMMAND")
+    if command and command.strip():
+        return "xoauth2", _token_from_command(command)
+    return "password", _env("IMAP_PASSWORD")
+
+
 def fetch_imap(days: int, limit: int) -> list[Message]:
     """Fetch messages from the last `days` days without changing any flags."""
     host = _env("IMAP_HOST")
     user = _env("IMAP_USER")
-    password = _env("IMAP_PASSWORD")
+    method, secret = _auth_secret()
     port = int(_env("IMAP_PORT", "993"))
     folder = _env("IMAP_FOLDER", "INBOX")
     since = (date.today() - timedelta(days=max(days - 1, 0))).strftime("%d-%b-%Y")
@@ -38,7 +74,18 @@ def fetch_imap(days: int, limit: int) -> list[Message]:
     except OSError as exc:
         raise SourceError(f"cannot connect to {host}:{port}: {exc}") from exc
     try:
-        conn.login(user, password)
+        if method == "xoauth2":
+            sent: list[bool] = []
+
+            def _respond(_challenge: bytes) -> bytes:
+                # A second challenge is the server's JSON error; answer empty to finish cleanly.
+                first = not sent
+                sent.append(True)
+                return xoauth2_string(user, secret) if first else b""
+
+            conn.authenticate("XOAUTH2", _respond)
+        else:
+            conn.login(user, secret)
         status, _ = conn.select(f'"{folder}"', readonly=True)
         if status != "OK":
             raise SourceError(f"cannot open folder {folder!r}")

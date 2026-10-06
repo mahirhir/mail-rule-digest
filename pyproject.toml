@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mail-rule-digest"
-version = "0.1.0"
+version = "0.2.0"
 description = "Filter an IMAP mailbox with a TOML rule file and write a daily Markdown digest."
 readme = "README.md"
 license = "MIT"
