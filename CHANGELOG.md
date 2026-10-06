@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0
 
 - Distinct exit codes and clearer errors, printed as `error: <kind>: <detail>`: `2` bad configuration (rules, `IMAP_*` env, `--eml-dir`, state file, webhook URL/format), `3` authentication failure (IMAP login, token command, webhook HTTP 401/403), `4` network failure (IMAP connect/session, webhook unreachable or other HTTP error). Previously a webhook failure exited `1` and a mailbox failure exited `2`. New `ConfigError`, `AuthError` and `NetworkError` (subclasses of `SourceError`). Secrets are never printed.
 - README: new Scheduling section (Task Scheduler, systemd, cron) and an Exit codes table.
