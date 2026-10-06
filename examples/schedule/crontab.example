@@ -1,0 +1,4 @@
+# Install with: crontab crontab.example   (edit paths first)
+# Fields: minute hour day-of-month month day-of-week command
+# Secrets (WEBHOOK_URL, IMAP settings) are loaded from a private env file (chmod 600).
+30 7 * * * . ~/.config/mail-rule-digest/env && cd ~/mail-rule-digest && python3 -m mail_rule_digest --rules ~/.config/mail-rule-digest/rules.toml --state ~/.local/state/mail-rule-digest/state.json --webhook
