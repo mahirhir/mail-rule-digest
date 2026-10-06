@@ -1,0 +1,10 @@
+# Install to ~/.config/systemd/user/ and run: systemctl --user daemon-reload
+# Secrets (WEBHOOK_URL, IMAP settings) live in the env file, never in this unit.
+[Unit]
+Description=Mail rule digest
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/.config/mail-rule-digest/env
+WorkingDirectory=%h/mail-rule-digest
+ExecStart=/usr/bin/python3 -m mail_rule_digest --rules %h/.config/mail-rule-digest/rules.toml --state %h/.local/state/mail-rule-digest/state.json --webhook

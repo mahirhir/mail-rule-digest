@@ -1,0 +1,11 @@
+# Enable with: systemctl --user enable --now mail-rule-digest.timer
+[Unit]
+Description=Run mail rule digest daily
+
+[Timer]
+OnCalendar=*-*-* 07:30:00
+Persistent=true
+Unit=mail-rule-digest.service
+
+[Install]
+WantedBy=timers.target
