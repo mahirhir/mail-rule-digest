@@ -12,6 +12,10 @@ from .rules import Match, Rule
 # Discord rejects content over 2000 characters; Slack's limit is far higher.
 DISCORD_LIMIT = 2000
 SLACK_LIMIT = 39000
+# Teams messages are capped near 28 KB including the card; leave headroom for the JSON wrapper.
+TEAMS_LIMIT = 20000
+TEAMS_HOSTS = (".logic.azure.com", ".powerplatform.com", ".webhook.office.com")
+WEBHOOK_FORMATS = ("auto", "discord", "slack", "teams")
 
 
 def _clean(text: str, limit: int = 120) -> str:
@@ -45,20 +49,47 @@ def render(rules: list[Rule], matches: list[Match], day: date) -> str:
     return "\n".join(lines) + "\n"
 
 
-def webhook_payload(url: str, markdown: str) -> dict[str, object]:
+def _cut(markdown: str, limit: int) -> str:
+    return markdown if len(markdown) <= limit else markdown[: limit - 4] + "\n..."
+
+
+def detect_format(url: str) -> str:
+    """Pick a webhook format from the host: discord, teams, or slack-style text."""
     host = (urlparse(url).hostname or "").lower()
     if host.endswith("discord.com") or host.endswith("discordapp.com"):
-        text = markdown if len(markdown) <= DISCORD_LIMIT else markdown[: DISCORD_LIMIT - 4] + "\n..."
+        return "discord"
+    if host.endswith(TEAMS_HOSTS):
+        return "teams"
+    return "slack"
+
+
+def webhook_payload(url: str, markdown: str, fmt: str = "auto") -> dict[str, object]:
+    if fmt not in WEBHOOK_FORMATS:
+        raise ValueError(f"unknown webhook format {fmt!r} (choose from {', '.join(WEBHOOK_FORMATS)})")
+    explicit = fmt != "auto"
+    if not explicit:
+        fmt = detect_format(url)
+    if fmt == "discord":
         # An email subject containing @everyone must not ping the channel.
-        return {"content": text, "allowed_mentions": {"parse": []}}
-    text = markdown if len(markdown) <= SLACK_LIMIT else markdown[: SLACK_LIMIT - 4] + "\n..."
-    return {"text": text}
+        return {"content": _cut(markdown, DISCORD_LIMIT), "allowed_mentions": {"parse": []}}
+    if fmt == "teams":
+        card = {
+            "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+            "type": "AdaptiveCard",
+            "version": "1.4",
+            "body": [{"type": "TextBlock", "text": _cut(markdown, TEAMS_LIMIT), "wrap": True}],
+        }
+        attachment = {"contentType": "application/vnd.microsoft.card.adaptive", "contentUrl": None, "content": card}
+        return {"type": "message", "attachments": [attachment]}
+    text = _cut(markdown, SLACK_LIMIT)
+    # Auto keeps the plain {"text": ...} body; an explicit slack choice adds mrkdwn.
+    return {"text": text, "mrkdwn": True} if explicit else {"text": text}
 
 
-def post_webhook(url: str, markdown: str, timeout: float = 15) -> int:
+def post_webhook(url: str, markdown: str, timeout: float = 15, fmt: str = "auto") -> int:
     if urlparse(url).scheme != "https":
         raise ValueError("webhook URL must use https")
-    body = json.dumps(webhook_payload(url, markdown)).encode()
+    body = json.dumps(webhook_payload(url, markdown, fmt)).encode()
     req = urllib.request.Request(
         url,
         data=body,

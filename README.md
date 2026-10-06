@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/mahirhir/mail-rule-digest/actions/workflows/ci.yml/badge.svg)](https://github.com/mahirhir/mail-rule-digest/actions/workflows/ci.yml)
 
-Read an IMAP mailbox, keep only the messages that match a small TOML rule file, and write one Markdown digest per day. Optionally post the digest to a Discord or Slack webhook.
+Read an IMAP mailbox, keep only the messages that match a small TOML rule file, and write one Markdown digest per day. Optionally post the digest to a Discord, Slack or Microsoft Teams webhook.
 
 - No runtime dependencies: Python 3.12 standard library only (`imaplib`, `email`, `tomllib`, `urllib`).
 - Read-only: the folder is opened with `EXAMINE` and messages are fetched with `BODY.PEEK[]`, so nothing is marked as read, moved or deleted.
@@ -45,6 +45,7 @@ mail-rule-digest --rules examples/rules.toml --eml-dir tests/fixtures --dry-run
 | `--limit N` | fetch at most the N most recent messages, default 500 |
 | `--out PATH` | digest file, default `digest-YYYY-MM-DD.md` |
 | `--webhook` | also POST the digest to `$WEBHOOK_URL` (https only) |
+| `--webhook-format F` | `auto` (default), `discord`, `slack` or `teams`; default from `$WEBHOOK_FORMAT` |
 | `--dry-run` | print to stdout; write no file, post nothing |
 
 Exit codes: `0` ok, `1` webhook failed, `2` bad rules / configuration / mailbox error.
@@ -148,8 +149,12 @@ On Windows use Task Scheduler with the same command; keep the variables in the t
 
 ## Webhooks
 
-- Host `discord.com` / `discordapp.com`: sends `{"content": ..., "allowed_mentions": {"parse": []}}`, cut to Discord's 2000-character limit. Mentions are disabled so a subject containing `@everyone` cannot ping the channel.
-- Anything else: sends `{"text": ...}` (Slack incoming webhooks, Mattermost, and most chat bridges accept this).
+Choose the payload with `--webhook-format {auto,discord,slack,teams}` or the `WEBHOOK_FORMAT` environment variable (the flag wins; an unknown value exits with code 2 before anything is written). The URL must be https.
+
+- `auto` (default): host `discord.com` / `discordapp.com` uses the Discord format, hosts ending in `.logic.azure.com`, `.powerplatform.com` or `.webhook.office.com` use the Teams format, anything else sends `{"text": ...}` (Slack, Mattermost and most chat bridges accept this).
+- `discord`: `{"content": ..., "allowed_mentions": {"parse": []}}`, cut to Discord's 2000-character limit. Mentions are disabled so a subject containing `@everyone` cannot ping the channel.
+- `slack`: `{"text": ..., "mrkdwn": true}` for Slack incoming webhooks.
+- `teams`: a Microsoft Teams Workflows (Power Automate) Adaptive Card message, a `message` with one `application/vnd.microsoft.card.adaptive` attachment holding a wrapped `TextBlock`, cut to about 20000 characters.
 
 ## Limitations
 
