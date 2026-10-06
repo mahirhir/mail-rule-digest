@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mail-rule-digest"
+version = "0.1.0"
+description = "Filter an IMAP mailbox with a TOML rule file and write a daily Markdown digest."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+authors = [{ name = "mahirhir" }]
+dependencies = []
+keywords = ["imap", "email", "digest", "automation", "webhook"]
+classifiers = [
+  "Programming Language :: Python :: 3.12",
+  "Environment :: Console",
+  "Topic :: Communications :: Email",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[project.scripts]
+mail-rule-digest = "mail_rule_digest.cli:main"
+
+[project.urls]
+Source = "https://github.com/mahirhir/mail-rule-digest"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM"]

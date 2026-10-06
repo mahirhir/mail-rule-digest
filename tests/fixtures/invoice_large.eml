@@ -1,0 +1,13 @@
+From: Acme Billing <billing@acme.example>
+To: you@example.org
+Subject: Invoice INV-1042 is ready
+Date: Mon, 05 Oct 2026 09:15:00 +0000
+Message-ID: <inv-1042@acme.example>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+
+Hello,
+
+Your invoice INV-1042 is ready.
+Total: $1,240.50
+Payment is due within 14 days.

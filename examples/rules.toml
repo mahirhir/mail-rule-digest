@@ -1,0 +1,27 @@
+# Every condition inside one rule must hold (AND).
+# Inside a list ("from", "body_any") any entry may match (OR).
+# A message can appear under several rules.
+
+[[rule]]
+name = "Invoices over $100"
+from = ["billing@acme.example", "*@invoices.example"]   # glob, case-insensitive
+subject = '(?i)\binvoice\b'                           # Python regex, searched
+body_any = ["due", "overdue"]                          # case-insensitive substring
+
+  [rule.numbers.amount]
+  # The named group must have the same name as the field.
+  pattern = 'Total:\s*\$(?P<amount>[\d,]+(?:\.\d+)?)'
+  min = 100
+
+[[rule]]
+name = "Disk alerts at 90% or more"
+from = "alerts@monitor.example"
+
+  [rule.numbers.disk]
+  pattern = '(?i)disk usage:?\s*(?P<disk>\d+)%'
+  min = 90
+  max = 100
+
+[[rule]]
+name = "Parcels out for delivery"
+body_all = ["tracking number", "out for delivery"]
