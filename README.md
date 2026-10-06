@@ -42,13 +42,17 @@ mail-rule-digest --rules examples/rules.toml --eml-dir tests/fixtures --dry-run
 | `--rules PATH` | TOML rule file (required) |
 | `--eml-dir DIR` | read `*.eml` files from a folder instead of IMAP |
 | `--days N` | IMAP look-back window in days, default 1 (today only) |
+| `--since YYYY-MM-DD` | only messages on or after this date; overrides `--days` for IMAP and filters `--eml-dir` by date (undated messages are kept) |
+| `--state PATH` | JSON state file of already-reported messages; they are skipped, so a scheduled run never reports one twice |
 | `--limit N` | fetch at most the N most recent messages, default 500 |
 | `--out PATH` | digest file, default `digest-YYYY-MM-DD.md` |
 | `--webhook` | also POST the digest to `$WEBHOOK_URL` (https only) |
 | `--webhook-format F` | `auto` (default), `discord`, `slack` or `teams`; default from `$WEBHOOK_FORMAT` |
 | `--dry-run` | print to stdout; write no file, post nothing |
 
-Exit codes: `0` ok, `1` webhook failed, `2` bad rules / configuration / mailbox error.
+Exit codes: `0` ok, `1` webhook failed, `2` bad rules / configuration / mailbox / state file error.
+
+With `--state`, each message is keyed by its `Message-ID` (or, if missing, a hash of sender, subject, date and the start of the body). The state is written only after the digest file was written and, with `--webhook`, after the webhook succeeded; `--dry-run` never writes it. Entries older than 180 days are pruned. A corrupt state file stops the run with exit code 2.
 
 ## OAuth2 (XOAUTH2) for Gmail and Microsoft 365
 

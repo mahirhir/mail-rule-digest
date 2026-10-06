@@ -22,6 +22,7 @@ class Message:
     subject: str
     date: datetime | None
     body: str
+    message_id: str = ""
 
 
 def _html_to_text(markup: str) -> str:
@@ -57,4 +58,5 @@ def parse_message(raw: bytes) -> Message:
         subject=str(msg.get("Subject", "")).strip(),
         date=date,
         body=_body_text(msg),
+        message_id=str(msg.get("Message-ID", "")).strip(),
     )

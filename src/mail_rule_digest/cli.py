@@ -13,6 +13,14 @@ from . import __version__
 from .digest import WEBHOOK_FORMATS, post_webhook, render
 from .rules import RuleError, apply_rules, load_rules
 from .sources import SourceError, fetch_imap, read_eml_dir
+from .state import StateError, load_state, message_key, save_state
+
+
+def _iso_date(value: str) -> date:
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid date {value!r} (expected YYYY-MM-DD)") from None
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -23,6 +31,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--rules", type=Path, required=True, help="path to the TOML rule file")
     p.add_argument("--eml-dir", type=Path, help="read .eml files from a folder instead of IMAP")
     p.add_argument("--days", type=int, default=1, help="look back this many days (IMAP only, default 1)")
+    p.add_argument("--since", type=_iso_date, metavar="YYYY-MM-DD", help="only messages on or after this date")
+    p.add_argument("--state", type=Path, help="JSON file of already-reported messages; they are skipped")
     p.add_argument("--limit", type=int, default=500, help="fetch at most this many recent messages (default 500)")
     p.add_argument("--out", type=Path, help="write the digest here (default: digest-YYYY-MM-DD.md)")
     p.add_argument("--webhook", action="store_true", help="also POST the digest to $WEBHOOK_URL")
@@ -48,11 +58,20 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     try:
         rules = load_rules(args.rules)
-        messages = read_eml_dir(args.eml_dir) if args.eml_dir else fetch_imap(args.days, args.limit)
-    except (RuleError, SourceError, OSError) as exc:
+        if args.eml_dir:
+            messages = read_eml_dir(args.eml_dir)
+            if args.since:
+                messages = [m for m in messages if m.date is None or m.date.date() >= args.since]
+        else:
+            messages = fetch_imap(args.days, args.limit, args.since)
+        seen = load_state(args.state) if args.state else set()
+    except (RuleError, SourceError, StateError, OSError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
+    keys = {message_key(m) for m in messages}
+    if args.state:
+        messages = [m for m in messages if message_key(m) not in seen]
     matches = apply_rules(rules, messages)
     markdown = render(rules, matches, today)
 
@@ -82,6 +101,13 @@ def main(argv: list[str] | None = None) -> int:
             print(f"error: webhook failed: {exc}", file=sys.stderr)
             return 1
         print(f"webhook: HTTP {status}", file=sys.stderr)
+
+    if args.state:
+        try:
+            save_state(args.state, seen | keys)
+        except OSError as exc:
+            print(f"error: cannot write state file {args.state}: {exc}", file=sys.stderr)
+            return 2
     return 0
 
 
