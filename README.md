@@ -50,7 +50,7 @@ mail-rule-digest --rules examples/rules.toml --eml-dir tests/fixtures --dry-run
 | `--webhook-format F` | `auto` (default), `discord`, `slack` or `teams`; default from `$WEBHOOK_FORMAT` |
 | `--dry-run` | print to stdout; write no file, post nothing |
 
-Exit codes: `0` ok, `1` webhook failed, `2` bad rules / configuration / mailbox / state file error.
+Exit codes: `0` ok, `2` bad configuration, `3` authentication failure, `4` network failure (see Exit codes below).
 
 With `--state`, each message is keyed by its `Message-ID` (or, if missing, a hash of sender, subject, date and the start of the body). The state is written only after the digest file was written and, with `--webhook`, after the webhook succeeded; `--dry-run` never writes it. Entries older than 180 days are pruned. A corrupt state file stops the run with exit code 2.
 
@@ -141,15 +141,43 @@ This is the real output of the quick-start command above on `tests/fixtures`:
 
 When a rule with numeric fields matches more than one message, a `_total <field>: ..._` line is added.
 
-## Running it daily
+## Scheduling
 
-cron, at 18:00:
+Ready-made files live in `examples/schedule/` (tests parse them, so they stay valid). Edit the paths first, keep secrets (`IMAP_*`, `WEBHOOK_URL`) in an environment file or user environment variables, never in the files. Every example passes `--state`, so a run reports only messages not reported before and re-running is harmless.
 
-```cron
-0 18 * * * cd /path/to/digests && . ./mail.env && mail-rule-digest --rules rules.toml --webhook
+Windows Task Scheduler (daily 07:30):
+
+```bat
+schtasks /Create /XML examples\schedule\mail-rule-digest-task.xml /TN "mail-rule-digest"
 ```
 
-On Windows use Task Scheduler with the same command; keep the variables in the task's environment, not in the rule file.
+systemd user units (daily 07:30, catches up after sleep):
+
+```sh
+mkdir -p ~/.config/systemd/user
+cp examples/schedule/mail-rule-digest.service examples/schedule/mail-rule-digest.timer ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now mail-rule-digest.timer
+```
+
+cron (`examples/schedule/crontab.example`, edit then `crontab crontab.example`):
+
+```cron
+30 7 * * * . ~/.config/mail-rule-digest/env && python3 -m mail_rule_digest --rules ~/rules.toml --state ~/.local/state/mail-rule-digest/state.json --webhook
+```
+
+## Exit codes
+
+Errors print as `error: <kind>: <detail>` on stderr, with a one-line hint. Passwords, tokens and webhook URLs are never included.
+
+| Code | Meaning |
+| --- | --- |
+| `0` | success |
+| `2` | bad configuration: rule file (missing, malformed TOML, invalid rules), `IMAP_*` environment, `--eml-dir`, state file, unset `WEBHOOK_URL`, unknown webhook format, non-https webhook URL |
+| `3` | authentication failed: IMAP login or XOAUTH2 rejected, token command failed, webhook answered HTTP 401 or 403 |
+| `4` | network failure: cannot connect to or lost the IMAP server (OS error, timeout, TLS error), webhook unreachable or answered another HTTP error |
+
+A webhook failure that carries no OS-level cause (a bare `URLError`) still exits `1`, as in earlier versions. Failures leave the state file untouched, so the next run retries the same messages.
 
 ## Webhooks
 
