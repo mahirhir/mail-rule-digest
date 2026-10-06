@@ -69,7 +69,7 @@ Access tokens expire (about an hour); a token command is the practical choice fo
 What you must do on your side:
 
 - Gmail (`imap.gmail.com`): create a Google Cloud project, enable the Gmail API, configure the OAuth consent screen, create an OAuth client, and obtain a token with scope `https://mail.google.com/`. Gmail IMAP needs that full-mail scope. An app in "Testing" status issues refresh tokens that expire after 7 days. Workspace admins can restrict third-party apps.
-- Microsoft 365 / Outlook.com (`outlook.office365.com`): register an app in Microsoft Entra ID, add the delegated permission `IMAP.AccessAsUser.All` (scope `https://outlook.office365.com/IMAP.AccessAsUser.All`, plus `offline_access` for refresh), and obtain a token for it. Your tenant admin may need to consent and must have IMAP enabled for the mailbox. `IMAP_USER` must be the mailbox address.
+- Microsoft 365 / Outlook.com (`outlook.office365.com`): register an app in Microsoft Entra ID, add the delegated permission `IMAP.AccessAsUser.All` (scope `https://outlook.office.com/IMAP.AccessAsUser.All`, plus `offline_access` for refresh), and obtain a token for it. Your tenant admin may need to consent and must have IMAP enabled for the mailbox. `IMAP_USER` must be the mailbox address.
 
 Not verified against live Gmail or Microsoft servers by this project's tests (the tests use a fake server); if a provider rejects the token, the error is shown as `IMAP error: ...` without the token.
 
